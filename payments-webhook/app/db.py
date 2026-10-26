@@ -40,7 +40,7 @@ def list_orders():
         for r in rows
     ]'''
 
-import sqlite3
+'''import sqlite3
 from datetime import datetime, timezone
 
 from .config import DB_PATH
@@ -95,6 +95,87 @@ def list_orders():
             "FROM orders ORDER BY id"
         ).fetchall()
 
+        return [
+            {
+                "payment_id": row[0],
+                "customer_email": row[1],
+                "amount": row[2],
+                "status": row[3],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+'''
+
+import sqlite3
+from datetime import datetime, timezone
+
+from .config import DB_PATH
+
+
+def get_conn():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS orders ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT UNIQUE, payment_id TEXT, "
+        "customer_email TEXT, amount REAL, status TEXT, created_at TEXT)"
+    )
+    return conn
+
+
+def save_order(event_id, payment_id, email, amount):
+    conn = get_conn()
+    try:
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO orders "
+            "(event_id, payment_id, customer_email, amount, status, created_at) "
+            "VALUES (?, ?, ?, ?, 'paid', ?)",
+            (
+                event_id,
+                payment_id,
+                email,
+                amount,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+        return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
+def event_exists(event_id):
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM orders WHERE event_id = ?",
+            (event_id,),
+        ).fetchone()
+        return row is not None
+    finally:
+        conn.close()
+
+
+def mark_refunded(payment_id):
+    conn = get_conn()
+    try:
+        conn.execute(
+            "UPDATE orders SET status = 'refunded' WHERE payment_id = ?",
+            (payment_id,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def list_orders():
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT payment_id, customer_email, amount, status "
+            "FROM orders ORDER BY id"
+        ).fetchall()
         return [
             {
                 "payment_id": row[0],
