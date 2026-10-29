@@ -1,0 +1,5 @@
+.env
+*.db
+outbox.log
+__pycache__/
+.venv/
